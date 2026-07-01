@@ -4,6 +4,8 @@ import {
   Terminal, AlertTriangle, Info, ChevronDown, ChevronUp, FileText,
   Copy, Check, X, RotateCcw
 } from 'lucide-react';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 import { CompilerOptions, LaTeXDiagnostics } from '../types';
 
 interface DocumentPreviewProps {
@@ -46,16 +48,6 @@ export default function DocumentPreview({
     if (!docElement) return;
 
     try {
-      // Lazy load html2pdf from cdn if not already present
-      const html2pdf = (window as any).html2pdf || await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        script.async = true;
-        script.onload = () => resolve((window as any).html2pdf);
-        script.onerror = reject;
-        document.body.appendChild(script);
-      });
-
       // Temporarily clear styling scale transformation to prevent clipping
       const originalTransform = docElement.style.transform;
       docElement.style.transform = 'scale(1)';
