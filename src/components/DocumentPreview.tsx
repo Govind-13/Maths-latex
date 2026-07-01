@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, Minus, RefreshCw, Printer, Download, Eye, 
   Terminal, AlertTriangle, Info, ChevronDown, ChevronUp, FileText,
-  Copy, Check, X, RotateCcw
+  Copy, Check, X, RotateCcw, Sparkles
 } from 'lucide-react';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -15,6 +15,7 @@ interface DocumentPreviewProps {
   compilerOptions: CompilerOptions;
   isCompiling: boolean;
   onForceRecompile: () => void;
+  onAiFix?: () => void;
 }
 
 export default function DocumentPreview({
@@ -24,6 +25,7 @@ export default function DocumentPreview({
   compilerOptions,
   isCompiling,
   onForceRecompile,
+  onAiFix,
 }: DocumentPreviewProps) {
   const [zoomLevel, setZoomLevel] = useState(0.8);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -410,7 +412,22 @@ export default function DocumentPreview({
         </div>
 
         {showDiagnostics && (
-          <div className="h-44 border-t border-slate-900 overflow-y-auto px-4 py-3 space-y-2 select-text font-mono text-[11px] leading-relaxed">
+          <div className="h-44 border-t border-slate-900 overflow-y-auto px-4 py-3 space-y-2 select-text font-mono text-[11px] leading-relaxed relative">
+            {diagnostics.length > 0 && onAiFix && (
+              <div className="sticky top-0 z-10 flex justify-end pb-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAiFix();
+                  }}
+                  disabled={isCompiling}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-bold text-[10px] rounded-md transition-all shadow-lg border border-indigo-400/30"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isCompiling ? 'animate-pulse' : ''}`} />
+                  AI Fix All Errors
+                </button>
+              </div>
+            )}
             {diagnostics.map((diag, idx) => (
               <div 
                 key={idx} 

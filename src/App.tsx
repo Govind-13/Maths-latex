@@ -6,6 +6,7 @@ import {
 import { TexFile, CompilerOptions, LaTeXDiagnostics } from './types';
 import { templates } from './utils/latexTemplates';
 import { compileLaTeXToReact } from './utils/latexParser';
+import { getAiFix } from './utils/ai';
 import Sidebar from './components/Sidebar';
 import CodeEditor from './components/CodeEditor';
 import DocumentPreview from './components/DocumentPreview';
@@ -66,6 +67,7 @@ export default function App() {
   const [tableOfContents, setTableOfContents] = useState<{ title: string; depth: number; id: string }[]>([]);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
   const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
+  const [isAiFixing, setIsAiFixing] = useState<boolean>(false);
 
   // Reference to the main code area textarea
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -204,6 +206,28 @@ export default function App() {
     setActiveFileId('main-tex');
   };
 
+  // AI Fix Handler
+  const handleAiFix = async () => {
+    const mainTex = files.find(f => f.name === 'main.tex');
+    if (!mainTex) return;
+
+    setIsAiFixing(true);
+    const diagString = diagnostics.map(d => `Line ${d.line}: ${d.message}`).join('\n');
+
+    try {
+      let fixedCode = await getAiFix(mainTex.content, diagString);
+      if (fixedCode) {
+        // Strip markdown code blocks if present
+        fixedCode = fixedCode.replace(/^```[a-z]*\n/i, '').replace(/\n```$/m, '').trim();
+        handleContentChange(fixedCode);
+      }
+    } catch (err) {
+      console.error("AI Fix failed:", err);
+    } finally {
+      setIsAiFixing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
       
@@ -271,8 +295,9 @@ export default function App() {
           diagnostics={diagnostics}
           toc={tableOfContents}
           compilerOptions={compilerOptions}
-          isCompiling={isCompiling}
+          isCompiling={isCompiling || isAiFixing}
           onForceRecompile={() => triggerCompile(true)}
+          onAiFix={handleAiFix}
         />
       </div>
 
