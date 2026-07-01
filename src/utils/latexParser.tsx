@@ -43,6 +43,31 @@ function findMatchingChar(text: string, startIndex: number, openChar: string, cl
   return -1;
 }
 
+function findMatchingEnvironment(text: string, startIndex: number, envName: string): number {
+  const openCmd = `\\begin{${envName}}`;
+  const closeCmd = `\\end{${envName}}`;
+
+  let depth = 1;
+  let pos = startIndex + openCmd.length;
+
+  while (depth > 0) {
+    const nextOpen = text.indexOf(openCmd, pos);
+    const nextClose = text.indexOf(closeCmd, pos);
+
+    if (nextClose === -1) return -1;
+
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      depth++;
+      pos = nextOpen + openCmd.length;
+    } else {
+      depth--;
+      if (depth === 0) return nextClose;
+      pos = nextClose + closeCmd.length;
+    }
+  }
+  return -1;
+}
+
 // Convert a LaTeX dimension option (e.g. 0.5\textwidth, 100px, 5cm) into a CSS style string
 function parseImageOptions(optionsStr: string): React.CSSProperties {
   const styles: React.CSSProperties = { maxWidth: '100%', height: 'auto' };
@@ -295,7 +320,7 @@ export function compileLaTeXToReact(
 
           const envName = text.substring(braceStart + 1, braceEnd).trim();
           const searchEndCmd = `\\end{${envName}}`;
-          const endEnvIndex = text.indexOf(searchEndCmd, braceEnd + 1);
+          const endEnvIndex = findMatchingEnvironment(text, idx, envName);
 
           if (endEnvIndex === -1) {
             diagnostics.push({
@@ -305,7 +330,7 @@ export function compileLaTeXToReact(
             });
             const remainingContent = text.substring(braceEnd + 1);
             nodes.push(
-              <div key={getUniqueId('env-error')} className="border-l-4 border-red-500 pl-4 py-1 my-2 bg-red-50/50">
+              <div key={getUniqueId('env-error')} className="border-l-4 border-red-500 pl-4 py-1 my-2 bg-[#fef2f2]/50">
                 <div className="font-bold text-red-700 text-sm">Environment Error: \begin{'{'}{envName}{'}'} has no matching \end</div>
                 <div>{parseContent(remainingContent, currentTextSize)}</div>
               </div>
@@ -321,8 +346,8 @@ export function compileLaTeXToReact(
             nodes.push(...parseContent(envContent, currentTextSize));
           } else if (envName === 'abstract') {
             nodes.push(
-              <div key={getUniqueId('abstract')} id={getUniqueId('abstract-card')} className="my-6 mx-8 text-sm text-gray-700 bg-gray-50/50 p-4 border border-gray-100 rounded-sm">
-                <div className="font-bold text-center tracking-wider uppercase mb-2 text-xs text-gray-900">Abstract</div>
+              <div key={getUniqueId('abstract')} id={getUniqueId('abstract-card')} className="my-6 mx-8 text-sm text-[#374151] bg-[#f9fafb] p-4 border border-[#f3f4f6] ">
+                <div className="font-bold text-center  uppercase mb-2 text-xs text-[#111827]">Abstract</div>
                 <div className="italic leading-relaxed text-justify">{parseContent(envContent, 'text-sm')}</div>
               </div>
             );
@@ -346,7 +371,7 @@ export function compileLaTeXToReact(
             );
           } else if (envName === 'quote') {
             nodes.push(
-              <blockquote key={getUniqueId('quote')} className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-600 mx-4">
+              <blockquote key={getUniqueId('quote')} className="border-l-4 border-[#d1d5db] pl-4 italic my-4 text-[#4b5563] mx-4">
                 {parseContent(envContent, currentTextSize)}
               </blockquote>
             );
@@ -401,7 +426,7 @@ export function compileLaTeXToReact(
               );
             } catch (err) {
               nodes.push(
-                <pre key={getUniqueId('display-math-err')} className="bg-red-50 text-red-600 text-xs font-mono p-2 rounded my-2">
+                <pre key={getUniqueId('display-math-err')} className="bg-[#fef2f2] text-[#dc2626] text-xs font-mono p-2 my-2">
                   {envContent}
                 </pre>
               );
@@ -431,8 +456,8 @@ export function compileLaTeXToReact(
               r: 'right',
             };
 
-            const headerStyle = "font-bold border-b-2 border-gray-300 px-4 py-2 bg-gray-50 text-xs uppercase tracking-wider";
-            const cellStyle = "border-b border-gray-200 px-4 py-2.5 text-sm";
+            const headerStyle = "font-bold border-b-2 border-[#d1d5db] px-4 py-2 bg-[#f9fafb] text-xs uppercase ";
+            const cellStyle = "border-b border-[#e5e7eb] px-4 py-2.5 text-sm";
 
             // Parse tabular rows separated by \\ and cells by &
             const rawRows = tabContent.split('\\\\');
@@ -461,8 +486,8 @@ export function compileLaTeXToReact(
                 const hasRightBorder = cols[cellIdx * 2 + 1] === '|';
 
                 const borderClasses = `
-                  ${hasLeftBorder ? 'border-l border-gray-200' : ''}
-                  ${hasRightBorder ? 'border-r border-gray-200' : ''}
+                  ${hasLeftBorder ? 'border-l border-[#e5e7eb]' : ''}
+                  ${hasRightBorder ? 'border-r border-[#e5e7eb]' : ''}
                 `.trim();
 
                 const style: React.CSSProperties = { textAlign: alignment };
@@ -489,7 +514,7 @@ export function compileLaTeXToReact(
               });
 
               tableRows.push(
-                <tr key={getUniqueId('tr')} className="hover:bg-gray-50/50 transition-colors">
+                <tr key={getUniqueId('tr')} className=" transition-colors">
                   {cellElements}
                 </tr>
               );
@@ -497,7 +522,7 @@ export function compileLaTeXToReact(
 
             nodes.push(
               <div key={getUniqueId('table-wrap')} id={getUniqueId('t-wrap')} className="my-6 overflow-x-auto w-full flex justify-center">
-                <table className="border-collapse border border-gray-300 max-w-full shadow-sm rounded-sm overflow-hidden bg-white">
+                <table className="border-collapse border border-[#d1d5db] max-w-full   overflow-hidden bg-white">
                   <tbody>{tableRows}</tbody>
                 </table>
               </div>
@@ -510,8 +535,8 @@ export function compileLaTeXToReact(
               message: `Rendering unknown environment \\begin{${envName}} as a simple container block.`,
             });
             nodes.push(
-              <div key={getUniqueId('env-generic')} className="my-2 p-2 border border-dashed border-gray-300 rounded">
-                <div className="text-xs text-gray-400 uppercase font-mono mb-1">{envName} Environment</div>
+              <div key={getUniqueId('env-generic')} className="my-2 p-2 border border-dashed border-[#d1d5db] rounded">
+                <div className="text-xs text-[#9ca3af] uppercase font-mono mb-1">{envName} Environment</div>
                 {parseContent(envContent, currentTextSize)}
               </div>
             );
@@ -522,21 +547,21 @@ export function compileLaTeXToReact(
         // --- DIRECT COMMANDS (\cmd{arg}) ---
         if (cmdName === 'maketitle') {
           nodes.push(
-            <div key={getUniqueId('maketitle')} id={getUniqueId('title-block')} className="text-center mb-10 border-b border-gray-100 pb-8 mt-4 select-none">
+            <div key={getUniqueId('maketitle')} id={getUniqueId('title-block')} className="text-center mb-10 border-b border-[#f3f4f6] pb-8 mt-4 select-none">
               {titleText && (
-                <h1 className="text-3.5xl font-extrabold tracking-tight text-gray-900 leading-tight mb-3">
+                <h1 className="text-3.5xl font-extrabold  text-[#111827] leading-tight mb-3">
                   {titleText}
                 </h1>
               )}
               {authorText && (
-                <div className="text-lg font-medium text-gray-700 italic mb-2 leading-relaxed">
+                <div className="text-lg font-medium text-[#374151] italic mb-2 leading-relaxed">
                   {authorText.split('\\\\').map((auth, aIdx) => (
                     <div key={aIdx}>{auth.trim()}</div>
                   ))}
                 </div>
               )}
               {dateText && (
-                <p className="text-sm font-semibold text-gray-500 mt-2">
+                <p className="text-sm font-semibold text-[#6b7280] mt-2">
                   {dateText === '\\today' ? new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : dateText}
                 </p>
               )}
@@ -548,8 +573,8 @@ export function compileLaTeXToReact(
 
         if (cmdName === 'tableofcontents') {
           nodes.push(
-            <div key={getUniqueId('toc')} id={getUniqueId('toc-block')} className="my-8 p-6 bg-slate-50 border border-slate-200 rounded shadow-sm max-w-2xl mx-auto">
-              <h2 className="text-xl font-bold border-b pb-2 mb-4 text-slate-800">Contents</h2>
+            <div key={getUniqueId('toc')} id={getUniqueId('toc-block')} className="my-8 p-6 bg-[#f8fafc] border border-[#e2e8f0]  max-w-2xl mx-auto">
+              <h2 className="text-xl font-bold border-b pb-2 mb-4 text-[#1e293b]">Contents</h2>
               <ul className="space-y-2">
                 {toc.map((item, tIdx) => (
                   <li
@@ -560,8 +585,8 @@ export function compileLaTeXToReact(
                     <a href={`#${item.id}`} className="text-blue-600 hover:underline hover:text-blue-800 flex-1 truncate">
                       {item.title}
                     </a>
-                    <span className="text-gray-400 font-mono">...............................................</span>
-                    <span className="text-gray-600 font-medium ml-2">{tIdx + 1}</span>
+                    <span className="text-[#9ca3af] font-mono">...............................................</span>
+                    <span className="text-[#4b5563] font-medium ml-2">{tIdx + 1}</span>
                   </li>
                 ))}
               </ul>
@@ -573,8 +598,8 @@ export function compileLaTeXToReact(
 
         if (cmdName === 'newpage') {
           nodes.push(
-            <div key={getUniqueId('newpage')} className="py-4 border-b-2 border-dashed border-sky-300 text-center select-none opacity-60 print:hidden my-8">
-              <span className="bg-sky-50 text-sky-600 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border border-sky-100">
+            <div key={getUniqueId('newpage')} className="py-4 border-b-2 border-dashed border-sky-300 text-center select-none  print:hidden my-8">
+              <span className="bg-sky-50 text-sky-600 text-xs font-bold uppercase  px-3 py-1  border border-sky-100">
                 Page Break
               </span>
             </div>
@@ -630,7 +655,7 @@ export function compileLaTeXToReact(
                   <h2
                     key={getUniqueId('section')}
                     id={headingId}
-                    className="text-2xl font-bold text-gray-900 border-b border-gray-200 pb-1 mt-8 mb-4 tracking-tight"
+                    className="text-2xl font-bold text-[#111827] border-b border-[#e5e7eb] pb-1 mt-8 mb-4 "
                   >
                     {numPrefix}{argument}
                   </h2>
@@ -640,7 +665,7 @@ export function compileLaTeXToReact(
                   <h3
                     key={getUniqueId('subsection')}
                     id={headingId}
-                    className="text-xl font-bold text-gray-800 mt-6 mb-3 tracking-tight"
+                    className="text-xl font-bold text-[#1f2937] mt-6 mb-3 "
                   >
                     {numPrefix}{argument}
                   </h3>
@@ -650,7 +675,7 @@ export function compileLaTeXToReact(
                   <h4
                     key={getUniqueId('subsubsection')}
                     id={headingId}
-                    className="text-lg font-bold text-gray-700 mt-4 mb-2 tracking-tight"
+                    className="text-lg font-bold text-[#374151] mt-4 mb-2 "
                   >
                     {numPrefix}{argument}
                   </h4>
@@ -660,7 +685,7 @@ export function compileLaTeXToReact(
                   <h5
                     key={getUniqueId('paragraph')}
                     id={headingId}
-                    className="text-base font-bold text-gray-600 mt-3 mb-1"
+                    className="text-base font-bold text-[#4b5563] mt-3 mb-1"
                   >
                     {argument}
                   </h5>
@@ -668,7 +693,7 @@ export function compileLaTeXToReact(
               }
             } else if (cmdName === 'textbf') {
               nodes.push(
-                <strong key={getUniqueId('bold')} className="font-bold text-gray-900">
+                <strong key={getUniqueId('bold')} className="font-bold text-[#111827]">
                   {parseContent(argument, currentTextSize)}
                 </strong>
               );
@@ -686,7 +711,7 @@ export function compileLaTeXToReact(
               );
             } else if (cmdName === 'texttt') {
               nodes.push(
-                <code key={getUniqueId('code')} className="font-mono text-sm bg-gray-50 border border-gray-100 rounded-md px-1.5 py-0.5 text-pink-600">
+                <code key={getUniqueId('code')} className="font-mono text-sm bg-[#f9fafb] border border-[#f3f4f6]  px-1.5 py-0.5 text-[#db2777]">
                   {argument}
                 </code>
               );
@@ -764,7 +789,7 @@ export function compileLaTeXToReact(
                     alt="LaTeX Illustration"
                     style={imgStyles}
                     referrerPolicy="no-referrer"
-                    className="rounded-sm border border-gray-100 shadow-sm object-contain"
+                    className=" border border-[#f3f4f6]  object-contain"
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -806,7 +831,7 @@ export function compileLaTeXToReact(
             } else {
               // Custom command or unhandled macros, output raw
               nodes.push(
-                <span key={getUniqueId('cmd-unknown')} className="text-gray-400 font-mono text-sm underline decoration-dotted">
+                <span key={getUniqueId('cmd-unknown')} className="text-[#9ca3af] font-mono text-sm underline decoration-dotted">
                   {argument}
                 </span>
               );
@@ -843,12 +868,12 @@ export function compileLaTeXToReact(
 
   // Layout classes mapping
   const fontClasses: { [key: string]: string } = {
-    'computer-modern': 'font-serif tracking-normal leading-relaxed',
-    times: 'font-serif tracking-normal leading-relaxed text-black style-times',
-    helvetica: 'font-sans tracking-wide leading-relaxed text-slate-800 style-helvetica',
+    'computer-modern': 'font-serif  leading-relaxed',
+    times: 'font-serif  leading-relaxed text-black style-times',
+    helvetica: 'font-sans  leading-relaxed text-[#1e293b] style-helvetica',
     courier: 'font-mono text-xs leading-normal style-courier',
-    garamond: 'font-serif tracking-normal leading-relaxed text-neutral-900 style-garamond',
-    georgia: 'font-serif tracking-normal leading-relaxed text-gray-900 style-georgia',
+    garamond: 'font-serif  leading-relaxed text-[#171717] style-garamond',
+    georgia: 'font-serif  leading-relaxed text-[#111827] style-georgia',
   };
 
   const marginClasses: { [key: string]: string } = {
@@ -877,7 +902,7 @@ export function compileLaTeXToReact(
         ${marginClasses[options.margin]}
         ${spacingClasses[options.lineSpacing]}
         ${paperClasses[options.paperSize]}
-        bg-white text-gray-900 shadow-2xl relative transition-all duration-300 mx-auto border border-gray-100 select-text text-justify overflow-hidden
+        bg-white text-[#111827]  relative  mx-auto border border-[#f3f4f6] select-text text-justify overflow-hidden
       `}
       style={{
         fontSize: options.fontSize === '10pt' ? '14px' : options.fontSize === '11pt' ? '15px' : '16px',
@@ -887,7 +912,7 @@ export function compileLaTeXToReact(
         {compiledElements}
       </div>
       {/* Decorative page number footer */}
-      <div className="absolute bottom-6 left-0 right-0 text-center text-xs text-gray-400 font-serif font-semibold select-none print:hidden">
+      <div className="absolute bottom-6 left-0 right-0 text-center text-xs text-[#9ca3af] font-serif font-semibold select-none print:hidden">
         1
       </div>
     </div>
