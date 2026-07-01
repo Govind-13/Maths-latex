@@ -44,13 +44,15 @@ function findMatchingChar(text: string, startIndex: number, openChar: string, cl
 }
 
 function findMatchingEnvironment(text: string, startIndex: number, envName: string): number {
-  const openCmd = '\\begin{' + envName + '}';
-  const closeCmd = '\\end{' + envName + '}';
+  // Explicitly avoid \b (backspace) interpretation by using string concatenation for commands
+  const openCmd = '\\' + 'begin{' + envName + '}';
+  const closeCmd = '\\' + 'end{' + envName + '}';
 
   let depth = 1;
   let pos = startIndex + openCmd.length;
 
-  while (depth > 0) {
+  // Robust depth-tracking algorithm for matching nested environments
+  while (depth > 0 && pos < text.length) {
     const nextOpen = text.indexOf(openCmd, pos);
     const nextClose = text.indexOf(closeCmd, pos);
 
@@ -156,25 +158,27 @@ export function compileLaTeXToReact(
 
   // 4. Extract document body
   let bodyText = processedLatex;
-  const docBeginIndex = processedLatex.indexOf('\\begin{document}');
-  const docEndIndex = processedLatex.indexOf('\\end{document}');
+  const startMarker = '\\' + 'begin{document}';
+  const endMarker = '\\' + 'end{document}';
+  const docBeginIndex = processedLatex.indexOf(startMarker);
+  const docEndIndex = processedLatex.indexOf(endMarker);
 
   if (docBeginIndex !== -1) {
     if (docEndIndex !== -1) {
-      bodyText = processedLatex.substring(docBeginIndex + '\\begin{document}'.length, docEndIndex);
+      bodyText = processedLatex.substring(docBeginIndex + startMarker.length, docEndIndex);
     } else {
       diagnostics.push({
         line: getLineNumber(docBeginIndex),
         type: 'warning',
         message: 'No matching \\end{document} found. Compiling remaining code.',
       });
-      bodyText = processedLatex.substring(docBeginIndex + '\\begin{document}'.length);
+      bodyText = processedLatex.substring(docBeginIndex + startMarker.length);
     }
   } else {
     diagnostics.push({
       line: 1,
       type: 'info',
-      message: 'No \\begin{document} block found. Parsing raw snippet as document body.',
+      message: 'No \\' + 'begin{document} block found. Parsing raw snippet as document body.',
     });
   }
 
@@ -271,7 +275,8 @@ export function compileLaTeXToReact(
         const nextChar = text[idx + 1];
         if (nextChar === '[' || nextChar === '(') {
           const isDisplay = nextChar === '[';
-          const closeDelimiter = isDisplay ? '\\]' : '\\)';
+          // Use string concat to avoid any potential escaping issues
+          const closeDelimiter = isDisplay ? '\\' + ']' : '\\' + ')';
           const endPos = text.indexOf(closeDelimiter, idx + 2);
 
           if (endPos !== -1) {
@@ -336,7 +341,7 @@ export function compileLaTeXToReact(
             diagnostics.push({
               line: getLineNumber(idx),
               type: 'error',
-              message: 'Malformed \\begin statement. Missing environment name.',
+              message: 'Malformed \\' + 'begin statement. Missing environment name.',
             });
             idx = cmdEnd;
             continue;
@@ -347,26 +352,26 @@ export function compileLaTeXToReact(
             diagnostics.push({
               line: getLineNumber(idx),
               type: 'error',
-              message: 'Unclosed environment name braces after \\begin',
+              message: 'Unclosed environment name braces after \\' + 'begin',
             });
             idx = braceStart + 1;
             continue;
           }
 
           const envName = text.substring(braceStart + 1, braceEnd).trim();
-          const searchEndCmd = `\\end{${envName}}`;
+          const closeCmd = '\\' + 'end{' + envName + '}';
           const endEnvIndex = findMatchingEnvironment(text, idx, envName);
 
           if (endEnvIndex === -1) {
             diagnostics.push({
               line: getLineNumber(idx),
               type: 'error',
-              message: `Missing closing statement ${searchEndCmd} for environment \\begin{${envName}}`,
+              message: `Missing closing statement ${closeCmd} for environment \\` + `begin{${envName}}`,
             });
             const remainingContent = text.substring(braceEnd + 1);
             nodes.push(
-              <div key={getUniqueId('env-error')} className="border-l-4 border-red-500 pl-4 py-1 my-2 bg-[#fef2f2]/50">
-                <div className="font-bold text-red-700 text-sm">Environment Error: \begin{'{'}{envName}{'}'} has no matching \end</div>
+              <div key={getUniqueId('env-error')} className="border-l-4 pl-4 py-1 my-2" style={{ borderColor: '#ef4444', backgroundColor: 'rgba(254, 242, 242, 0.5)' }}>
+                <div className="font-bold text-sm" style={{ color: '#b91c1c' }}>Environment Error: \{'\\' + 'begin'}{'{'}{envName}{'}'} has no matching \{'\\' + 'end'}</div>
                 <div>{parseContent(remainingContent, currentTextSize)}</div>
               </div>
             );
@@ -374,7 +379,7 @@ export function compileLaTeXToReact(
           }
 
           const envContent = text.substring(braceEnd + 1, endEnvIndex);
-          idx = endEnvIndex + searchEndCmd.length;
+          idx = endEnvIndex + closeCmd.length;
 
           // Process known environments
           if (envName === 'document') {
@@ -412,15 +417,15 @@ export function compileLaTeXToReact(
             );
           } else if (envName === 'tipbox') {
             nodes.push(
-              <div key={getUniqueId('tipbox')} className="my-6 mx-4 p-4 bg-sky-50 border-l-4 border-sky-500 flex items-start gap-3 shadow-sm rounded-r-lg">
+              <div key={getUniqueId('tipbox')} className="my-6 mx-4 p-4 flex items-start gap-3 rounded-r-lg" style={{ backgroundColor: '#f0f9ff', borderLeft: '4px solid #0ea5e9' }}>
                 <div className="mt-1 shrink-0">
-                  <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5" style={{ color: '#0284c7' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="font-bold text-sky-900 text-sm mb-1 uppercase tracking-wider">Tip</div>
-                  <div className="text-sky-800 leading-relaxed">{parseContent(envContent, 'text-sm')}</div>
+                  <div className="font-bold text-sm mb-1 uppercase tracking-wider" style={{ color: '#0c4a6e' }}>Tip</div>
+                  <div className="leading-relaxed" style={{ color: '#075985' }}>{parseContent(envContent, 'text-sm')}</div>
                 </div>
               </div>
             );
@@ -487,13 +492,13 @@ export function compileLaTeXToReact(
             let columnsLayout = 'l';
             let tabContent = envContent;
 
-            if (colBraceStart !== -1 && colBraceStart < text.indexOf('\\begin', braceEnd + 1) && colBraceStart < text.indexOf('}', colBraceStart)) {
+            if (colBraceStart !== -1 && colBraceStart < text.indexOf('\\' + 'begin', braceEnd + 1) && colBraceStart < text.indexOf('}', colBraceStart)) {
               const colBraceEnd = findMatchingChar(text, colBraceStart, '{', '}');
               if (colBraceEnd !== -1) {
                 columnsLayout = text.substring(colBraceStart + 1, colBraceEnd).trim();
                 // If column format was parsed, adjust where tabContent begins
                 tabContent = text.substring(colBraceEnd + 1, endEnvIndex);
-                idx = endEnvIndex + searchEndCmd.length;
+                idx = endEnvIndex + closeCmd.length;
               }
             }
 
@@ -581,7 +586,7 @@ export function compileLaTeXToReact(
             diagnostics.push({
               line: getLineNumber(idx),
               type: 'info',
-              message: `Rendering unknown environment \\begin{${envName}} as a simple container block.`,
+              message: `Rendering unknown environment \\` + `begin{${envName}} as a simple container block.`,
             });
             nodes.push(
               <div key={getUniqueId('env-generic')} className="my-2 p-2 border border-dashed border-[#d1d5db] rounded">
@@ -647,8 +652,8 @@ export function compileLaTeXToReact(
 
         if (cmdName === 'newpage') {
           nodes.push(
-            <div key={getUniqueId('newpage')} className="py-4 border-b-2 border-dashed border-sky-300 text-center select-none  print:hidden my-8">
-              <span className="bg-sky-50 text-sky-600 text-xs font-bold uppercase  px-3 py-1  border border-sky-100">
+            <div key={getUniqueId('newpage')} className="py-4 border-b-2 border-dashed text-center select-none print:hidden my-8" style={{ borderColor: '#7dd3fc' }}>
+              <span className="text-xs font-bold uppercase px-3 py-1 border" style={{ backgroundColor: '#f0f9ff', color: '#0284c7', borderColor: '#e0f2fe' }}>
                 Page Break
               </span>
             </div>

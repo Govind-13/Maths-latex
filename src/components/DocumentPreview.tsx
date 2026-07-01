@@ -58,7 +58,42 @@ export default function DocumentPreview({
         margin: 0,
         filename: 'Compiled_Document.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          onclone: (clonedDoc: Document) => {
+            // Traverse the cloned document and fix oklch colors which crash html2canvas/html2pdf
+            const elements = clonedDoc.getElementsByTagName('*');
+            for (let i = 0; i < elements.length; i++) {
+              const el = elements[i] as HTMLElement;
+              const style = window.getComputedStyle(el);
+
+              // Helper to fix specific oklch properties
+              const fixOklch = (prop: string) => {
+                const val = style.getPropertyValue(prop);
+                if (val && val.includes('oklch')) {
+                  // Reverting to a safe fallback or attempting to strip the function
+                  // Since we can't easily compute oklch to hex here without a heavy library,
+                  // we will force standard colors for the PDF export clone.
+                  if (prop === 'color') el.style.color = '#111827';
+                  if (prop === 'background-color') el.style.backgroundColor = 'transparent';
+                  if (prop === 'border-color') el.style.borderColor = '#e5e7eb';
+                }
+              };
+
+              fixOklch('color');
+              fixOklch('background-color');
+              fixOklch('border-color');
+
+              // Also strip some problematic tailwind utility classes in the clone
+              if (el.classList.contains('shadow-sm')) el.style.boxShadow = 'none';
+              if (el.classList.contains('shadow')) el.style.boxShadow = 'none';
+              if (el.classList.contains('tracking-wider')) el.style.letterSpacing = 'normal';
+              if (el.classList.contains('tracking-tight')) el.style.letterSpacing = 'normal';
+            }
+          }
+        },
         jsPDF: { 
           unit: 'mm', 
           format: compilerOptions.paperSize === 'a4' ? 'a4' : 'letter', 

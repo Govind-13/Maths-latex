@@ -217,8 +217,14 @@ export default function App() {
     try {
       let fixedCode = await getAiFix(mainTex.content, diagString);
       if (fixedCode) {
-        // Strip markdown code blocks if present
-        fixedCode = fixedCode.replace(/^```[a-z]*\n/i, '').replace(/\n```$/m, '').trim();
+        // Robustly strip markdown code blocks if present
+        fixedCode = fixedCode.trim();
+
+        // Remove start fences
+        fixedCode = fixedCode.replace(/^```[a-z]*\s*\n/gi, '');
+        // Remove end fences
+        fixedCode = fixedCode.replace(/\n\s*```$/g, '');
+
         handleContentChange(fixedCode);
       }
     } catch (err) {
