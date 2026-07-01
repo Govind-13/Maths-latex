@@ -44,8 +44,8 @@ function findMatchingChar(text: string, startIndex: number, openChar: string, cl
 }
 
 function findMatchingEnvironment(text: string, startIndex: number, envName: string): number {
-  const openCmd = `\\begin{${envName}}`;
-  const closeCmd = `\\end{${envName}}`;
+  const openCmd = '\\begin{' + envName + '}';
+  const closeCmd = '\\end{' + envName + '}';
 
   let depth = 1;
   let pos = startIndex + openCmd.length;
@@ -267,6 +267,41 @@ export function compileLaTeXToReact(
 
       // --- HANDLE COMMANDS OR ENVIRONMENTS (\...) ---
       if (text[idx] === '\\') {
+        // Handle \[ ... \] and \( ... \)
+        const nextChar = text[idx + 1];
+        if (nextChar === '[' || nextChar === '(') {
+          const isDisplay = nextChar === '[';
+          const closeDelimiter = isDisplay ? '\\]' : '\\)';
+          const endPos = text.indexOf(closeDelimiter, idx + 2);
+
+          if (endPos !== -1) {
+            const mathFormula = text.substring(idx + 2, endPos).trim();
+            try {
+              const html = katex.renderToString(mathFormula, {
+                displayMode: isDisplay,
+                throwOnError: false,
+              });
+              const MathClass = isDisplay ? 'my-4 block w-full text-center overflow-x-auto py-2' : 'inline-block px-1';
+              nodes.push(
+                <span
+                  key={getUniqueId('math-alt')}
+                  id={getUniqueId('math-el-alt')}
+                  className={MathClass}
+                  dangerouslySetInnerHTML={{ __html: html }}
+                />
+              );
+            } catch (err) {
+              nodes.push(
+                <code key={getUniqueId('math-error-alt')} className="text-red-500 text-xs font-mono px-1">
+                  {mathFormula}
+                </code>
+              );
+            }
+            idx = endPos + 2;
+            continue;
+          }
+        }
+
         // Find command name
         let cmdEnd = idx + 1;
         while (cmdEnd < text.length && /[a-zA-Z]/.test(text[cmdEnd])) {
@@ -374,6 +409,20 @@ export function compileLaTeXToReact(
               <blockquote key={getUniqueId('quote')} className="border-l-4 border-[#d1d5db] pl-4 italic my-4 text-[#4b5563] mx-4">
                 {parseContent(envContent, currentTextSize)}
               </blockquote>
+            );
+          } else if (envName === 'tipbox') {
+            nodes.push(
+              <div key={getUniqueId('tipbox')} className="my-6 mx-4 p-4 bg-sky-50 border-l-4 border-sky-500 flex items-start gap-3 shadow-sm rounded-r-lg">
+                <div className="mt-1 shrink-0">
+                  <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-sky-900 text-sm mb-1 uppercase tracking-wider">Tip</div>
+                  <div className="text-sky-800 leading-relaxed">{parseContent(envContent, 'text-sm')}</div>
+                </div>
+              </div>
             );
           } else if (envName === 'itemize' || envName === 'enumerate') {
             // Split content by \item
