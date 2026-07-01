@@ -1,0 +1,6 @@
+{
+  "name": "LaTeX Document & PDF Editor",
+  "description": "An elegant, interactive real-time LaTeX document editor and preview compiler supporting fonts, colors, custom image embedding, math formulas, and high-quality vector PDF exports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
